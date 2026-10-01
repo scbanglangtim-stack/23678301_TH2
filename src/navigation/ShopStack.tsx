@@ -6,7 +6,7 @@ import { VARIANT } from '@constants/student';
 
 export type ShopStackParamList = {
   Home: undefined;
-  Detail: { id: number | string };
+  Detail: { id: string };
 };
 
 const Stack = createNativeStackNavigator<ShopStackParamList>();

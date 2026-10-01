@@ -54,7 +54,7 @@ export const HomeScreen = () => {
   }, [products, debouncedSearch]);
 
   const handleCardPress = useCallback((id: number) => {
-    navigation.navigate('Detail', { id });
+    navigation.navigate('Detail', { id: String(id) });
   }, [navigation]);
 
   const handleRefresh = useCallback(() => {
