@@ -1,0 +1,28 @@
+# OSX
+.DS_Store
+
+# Node
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Xcode
+.idea
+.vscode
+*.xcuserstate
+project.xcworkspace
+build/
+
+# Android
+android/app/build/
+android/build/
+.gradle/
+android/.gradle/
+local.properties
+android/local.properties
+
+# Temporary
+*.tmp
+*.log
+THUC-HANH-2_extracted.md
+extracted_doc_content.txt
