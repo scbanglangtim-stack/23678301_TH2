@@ -11,29 +11,35 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { useCartStore, CartItem } from '@stores/cartStore';
 import useCampusLocation from '@hooks/useCampusLocation';
-import { STUDENT, ROOM_LABEL, VARIANT } from '@constants/student';
+import { STUDENT, ROOM_LABEL, VARIANT, BASE_SHIP_FEE } from '@constants/student';
 import Watermark from '@components/Watermark';
 
 export const CartScreen = () => {
   const navigation = useNavigation();
   const items = useCartStore((state) => state.items);
   const removeItem = useCartStore((state) => state.removeItem);
-  const totalAmount = useCartStore((state) => state.totalAmount());
+  const changeQty = useCartStore((state) => state.changeQty);
   const clearCart = useCartStore((state) => state.clearCart);
+
+  // totalAmount() tính trực tiếp từ store (price đã nhân PRICE_MULTIPLIER lúc add)
+  const totalItems = useCartStore((state) => state.totalAmount());
 
   const { coords, shipFee } = useCampusLocation();
 
-  const effectiveShipFee = coords ? shipFee : 12000;
-  const grandTotal = totalAmount + (items.length > 0 ? effectiveShipFee : 0);
-  const formattedGrandTotal = grandTotal.toLocaleString('vi-VN') + ' đ';
+  // Phí ship: lấy từ GPS nếu đã có quyền, không thì dùng BASE_SHIP_FEE
+  const effectiveShipFee = coords ? shipFee : BASE_SHIP_FEE;
+  const grandTotal = totalItems + (items.length > 0 ? effectiveShipFee : 0);
+
+  const formattedItemsTotal = totalItems.toLocaleString('vi-VN') + ' đ';
   const formattedShipFee = effectiveShipFee.toLocaleString('vi-VN') + ' đ';
+  const formattedGrandTotal = grandTotal.toLocaleString('vi-VN') + ' đ';
 
   const handleCheckout = () => {
     if (items.length === 0) return;
 
     Alert.alert(
       `Xác nhận đặt đơn · KTXGo`,
-      `Sinh viên: ${STUDENT.hoTen} (${STUDENT.mssv})\nPhòng nhận: ${ROOM_LABEL}\nTổng thanh toán: ${formattedGrandTotal}\n(Shipper nội khu sẽ giao tận phòng)`,
+      `Sinh viên: ${STUDENT.hoTen} (${STUDENT.mssv})\nPhòng nhận: ${ROOM_LABEL}\nTiền hàng: ${formattedItemsTotal}\nPhí ship (công thức ${VARIANT.shipFormula}): ${formattedShipFee}\nTổng: ${formattedGrandTotal}\n(Shipper nội khu sẽ giao tận phòng)`,
       [
         { text: 'Hủy', style: 'cancel' },
         {
@@ -52,22 +58,51 @@ export const CartScreen = () => {
 
     return (
       <View style={styles.itemCard}>
+        {/* Thông tin sản phẩm */}
         <View style={styles.itemLeft}>
-          <Text style={styles.itemTitle}>{item.title}</Text>
+          <Text style={styles.itemTitle} numberOfLines={1}>
+            {item.title}
+          </Text>
           <Text style={styles.itemSubtitle}>
             ×{item.quantity}  {itemTotal}
           </Text>
         </View>
 
-        <TouchableOpacity
-          style={styles.deleteBtn}
-          onPress={() => removeItem(item.id)}
-          activeOpacity={0.8}
-          accessibilityLabel={`Xóa ${item.title}`}
-          accessibilityRole="button"
-        >
-          <Text style={styles.deleteIcon}>🗑️</Text>
-        </TouchableOpacity>
+        {/* Nút sửa SL: − / + và xóa */}
+        <View style={styles.itemActions}>
+          {/* Nút − giảm SL (nếu SL = 1 thì xóa) */}
+          <TouchableOpacity
+            style={styles.qtyBtn}
+            onPress={() => changeQty(item.id, -1)}
+            activeOpacity={0.8}
+            accessibilityLabel={`Giảm số lượng ${item.title}`}
+          >
+            <Text style={styles.qtyBtnText}>−</Text>
+          </TouchableOpacity>
+
+          <Text style={styles.qtyNumber}>{item.quantity}</Text>
+
+          {/* Nút + tăng SL */}
+          <TouchableOpacity
+            style={styles.qtyBtn}
+            onPress={() => changeQty(item.id, 1)}
+            activeOpacity={0.8}
+            accessibilityLabel={`Tăng số lượng ${item.title}`}
+          >
+            <Text style={styles.qtyBtnText}>+</Text>
+          </TouchableOpacity>
+
+          {/* Nút xóa */}
+          <TouchableOpacity
+            style={styles.deleteBtn}
+            onPress={() => removeItem(item.id)}
+            activeOpacity={0.8}
+            accessibilityLabel={`Xóa ${item.title}`}
+            accessibilityRole="button"
+          >
+            <Text style={styles.deleteIcon}>🗑️</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   };
@@ -89,6 +124,7 @@ export const CartScreen = () => {
       </View>
 
       {items.length === 0 ? (
+        /* ─── GIỎ TRỐNG ───────────────────────────────────────────── */
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyIcon}>🛒</Text>
           <Text style={styles.emptyTitle}>Giỏ hàng đang trống</Text>
@@ -104,6 +140,7 @@ export const CartScreen = () => {
           </TouchableOpacity>
         </View>
       ) : (
+        /* ─── CÓ HÀNG TRONG GIỎ ──────────────────────────────────── */
         <View style={styles.content}>
           <FlatList
             data={items}
@@ -112,7 +149,7 @@ export const CartScreen = () => {
             contentContainerStyle={styles.listContainer}
             ListFooterComponent={
               <View>
-                {/* Orange-Bordered Delivery Info Card matching Mockup */}
+                {/* Delivery Info Card — cam viền theo mockup */}
                 <View style={styles.deliveryCard}>
                   <Text style={styles.deliveryRoom}>Giao đến {ROOM_LABEL}</Text>
                   <Text style={styles.deliveryShip}>
@@ -120,7 +157,12 @@ export const CartScreen = () => {
                   </Text>
                 </View>
 
-                {/* Total Text */}
+                {/* Tổng hàng (items subtotal) */}
+                <Text style={styles.subtotalText}>
+                  Tiền hàng: {formattedItemsTotal}
+                </Text>
+
+                {/* Grand total */}
                 <Text style={styles.totalText}>
                   Tổng hàng: {formattedGrandTotal}
                 </Text>
@@ -186,13 +228,15 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 16,
   },
+
+  // ── Item Card ──────────────────────────────────────────────────────────────
   itemCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#BFDBFE',
     paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingVertical: 10,
     marginBottom: 8,
     flexDirection: 'row',
     alignItems: 'center',
@@ -205,6 +249,7 @@ const styles = StyleSheet.create({
   },
   itemLeft: {
     flex: 1,
+    marginRight: 8,
   },
   itemTitle: {
     fontSize: 14,
@@ -217,18 +262,49 @@ const styles = StyleSheet.create({
     marginTop: 3,
     fontWeight: '500',
   },
-  deleteBtn: {
-    backgroundColor: '#DC2626',
-    width: 34,
-    height: 34,
-    borderRadius: 8,
+  itemActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+
+  // ── Qty +/− buttons ────────────────────────────────────────────────────────
+  qtyBtn: {
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1.5,
+    borderColor: '#BFDBFE',
+    width: 28,
+    height: 28,
+    borderRadius: 7,
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: 10,
+  },
+  qtyBtnText: {
+    color: '#1D4ED8',
+    fontSize: 16,
+    fontWeight: '800',
+    lineHeight: 18,
+  },
+  qtyNumber: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#1E3A8A',
+    minWidth: 24,
+    textAlign: 'center',
+  },
+  deleteBtn: {
+    backgroundColor: '#DC2626',
+    width: 30,
+    height: 30,
+    borderRadius: 7,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 6,
   },
   deleteIcon: {
-    fontSize: 15,
+    fontSize: 13,
   },
+
+  // ── Delivery + Totals ──────────────────────────────────────────────────────
   deliveryCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
@@ -237,7 +313,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
     marginTop: 4,
-    marginBottom: 12,
+    marginBottom: 10,
   },
   deliveryRoom: {
     fontSize: 14,
@@ -250,8 +326,15 @@ const styles = StyleSheet.create({
     color: '#EA580C',
     marginTop: 3,
   },
+  subtotalText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#64748B',
+    textAlign: 'right',
+    marginBottom: 4,
+  },
   totalText: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '800',
     color: '#1D4ED8',
     textAlign: 'center',
@@ -275,6 +358,8 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
   },
+
+  // ── Empty Cart ─────────────────────────────────────────────────────────────
   emptyContainer: {
     flex: 1,
     alignItems: 'center',

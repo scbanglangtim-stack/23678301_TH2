@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,8 @@ import {
   StyleSheet,
   ActivityIndicator,
   TouchableOpacity,
+  ScrollView,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -28,7 +30,7 @@ export const HomeScreen = () => {
 
   const {
     data: products,
-    isLoading,
+    isPending,   // RQ v5: isPending = true khi chưa có data lần đầu
     isError,
     refetch,
     isRefetching,
@@ -36,6 +38,7 @@ export const HomeScreen = () => {
     queryKey: ['products'],
     queryFn: fetchProducts,
     staleTime: STALE_TIME_MS,
+    retry: 2,
   });
 
   const filteredProducts = useMemo(() => {
@@ -50,13 +53,82 @@ export const HomeScreen = () => {
     );
   }, [products, debouncedSearch]);
 
-  const handleCardPress = (id: number) => {
+  const handleCardPress = useCallback((id: number) => {
     navigation.navigate('Detail', { id });
-  };
+  }, [navigation]);
 
+  const handleRefresh = useCallback(() => {
+    refetch();
+  }, [refetch]);
+
+  // ─── CẢNH 1: ĐANG TẢI ───────────────────────────────────────────────────────
+  if (isPending) {
+    return (
+      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+        <View style={styles.blueBanner}>
+          <View>
+            <Text style={styles.bannerTitle}>KTXGO</Text>
+            <Text style={styles.bannerSubtitle}>Giao tận {ROOM_LABEL}</Text>
+          </View>
+          <Text style={styles.badgeA}>(A)</Text>
+        </View>
+
+        <View style={styles.centerBox}>
+          <ActivityIndicator size="large" color="#1D4ED8" />
+          <Text style={styles.loadingText}>Đang tải món...</Text>
+        </View>
+
+        {/* Watermark DƯỚI cho thí sinh số cuối 1 */}
+        <Watermark />
+      </SafeAreaView>
+    );
+  }
+
+  // ─── CẢNH 2: LỖI MẠNG ───────────────────────────────────────────────────────
+  if (isError) {
+    return (
+      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+        <View style={styles.blueBanner}>
+          <View>
+            <Text style={styles.bannerTitle}>KTXGO</Text>
+            <Text style={styles.bannerSubtitle}>Giao tận {ROOM_LABEL}</Text>
+          </View>
+          <Text style={styles.badgeA}>(A)</Text>
+        </View>
+
+        {/* ScrollView với RefreshControl để pull-to-refetch ngay cả khi lỗi */}
+        <ScrollView
+          contentContainerStyle={styles.centerBox}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefetching}
+              onRefresh={handleRefresh}
+              colors={['#1D4ED8']}
+              tintColor="#1D4ED8"
+            />
+          }
+        >
+          <Text style={styles.errorMssv}>{STUDENT.mssv}</Text>
+          <Text style={styles.errorMessage}>Không tải được dữ liệu món.</Text>
+          <TouchableOpacity
+            style={styles.retryBtn}
+            onPress={handleRefresh}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.retryText}>Thử lại</Text>
+          </TouchableOpacity>
+        </ScrollView>
+
+        {/* Watermark DƯỚI cho thí sinh số cuối 1 */}
+        <Watermark />
+      </SafeAreaView>
+    );
+  }
+
+  // ─── CẢNH 3: CÓ DỮ LIỆU ─────────────────────────────────────────────────────
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-      {/* Blue Header Banner with (A) */}
+      {/* Blue Header Banner với nhãn (A) */}
       <View style={styles.blueBanner}>
         <View>
           <Text style={styles.bannerTitle}>KTXGO</Text>
@@ -65,7 +137,7 @@ export const HomeScreen = () => {
         <Text style={styles.badgeA}>(A)</Text>
       </View>
 
-      {/* Search Input Box with (B) */}
+      {/* Ô tìm kiếm debounce DEBOUNCE_MS=400ms với nhãn (B) */}
       <View style={styles.searchWrapper}>
         <View style={styles.searchContainer}>
           <TextInput
@@ -79,56 +151,35 @@ export const HomeScreen = () => {
         </View>
       </View>
 
-      {/* Network States (Chương 6 & 4) */}
-      {isLoading ? (
-        <View style={styles.centerBox}>
-          <ActivityIndicator size="large" color="#1D4ED8" />
-          <Text style={styles.loadingText}>Đang tải món...</Text>
-        </View>
-      ) : isError ? (
-        <View style={styles.centerBox}>
-          <Text style={styles.errorMssv}>{STUDENT.mssv}</Text>
-          <Text style={styles.errorMessage}>Không tải được dữ liệu món.</Text>
-          <TouchableOpacity
-            style={styles.retryBtn}
-            onPress={() => refetch()}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.retryText}>Thử lại</Text>
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <View style={styles.body}>
-          {/* Label (C) FlashList x2 */}
-          <Text style={styles.labelFlashList}>(C) FlashList ×2</Text>
+      {/* Nhãn (C) FlashList × 2 */}
+      <Text style={styles.labelFlashList}>(C) FlashList ×2</Text>
 
-          <View style={styles.listWrapper}>
-            <FlashList
-              data={filteredProducts}
-              numColumns={2}
-              estimatedItemSize={170}
-              keyExtractor={(item) => `${STUDENT.mssv}-${item.id}`}
-              renderItem={({ item, index }) => (
-                <ProductCard
-                  product={item}
-                  index={index}
-                  onPress={() => handleCardPress(item.id)}
-                />
-              )}
-              contentContainerStyle={styles.listContent}
-              refreshing={isRefetching}
-              onRefresh={refetch}
-              ListEmptyComponent={
-                <View style={styles.emptyBox}>
-                  <Text style={styles.emptyText}>
-                    Không tìm thấy món nào khớp với "{debouncedSearch}"
-                  </Text>
-                </View>
-              }
+      {/* FlashList 2 cột, keyExtractor ghép MSSV, pull-to-refresh = refetch */}
+      <View style={styles.body}>
+        <FlashList
+          data={filteredProducts}
+          numColumns={2}
+          estimatedItemSize={170}
+          keyExtractor={(item) => `${STUDENT.mssv}-${item.id}`}
+          renderItem={({ item, index }) => (
+            <ProductCard
+              product={item}
+              index={index}
+              onPress={() => handleCardPress(item.id)}
             />
-          </View>
-        </View>
-      )}
+          )}
+          contentContainerStyle={styles.listContent}
+          refreshing={isRefetching}
+          onRefresh={handleRefresh}
+          ListEmptyComponent={
+            <View style={styles.emptyBox}>
+              <Text style={styles.emptyText}>
+                Không tìm thấy món nào khớp với "{debouncedSearch}"
+              </Text>
+            </View>
+          }
+        />
+      </View>
 
       {/* Watermark DƯỚI cho thí sinh số cuối 1 */}
       <Watermark />
@@ -200,12 +251,9 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     paddingHorizontal: 14,
     marginTop: 4,
-    marginBottom: 4,
+    marginBottom: 2,
   },
   body: {
-    flex: 1,
-  },
-  listWrapper: {
     flex: 1,
     paddingHorizontal: 6,
   },
@@ -225,27 +273,27 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   errorMssv: {
-    fontSize: 18,
+    fontSize: 22,
     fontWeight: '900',
     color: '#DC2626',
-    marginBottom: 4,
+    marginBottom: 6,
   },
   errorMessage: {
     fontSize: 14,
     fontWeight: '700',
     color: '#1E3A8A',
     textAlign: 'center',
-    marginBottom: 16,
+    marginBottom: 18,
   },
   retryBtn: {
     backgroundColor: '#DC2626',
     borderRadius: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 36,
+    paddingVertical: 11,
+    paddingHorizontal: 40,
   },
   retryText: {
     color: '#FFFFFF',
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '700',
   },
   emptyBox: {
