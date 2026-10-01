@@ -1,18 +1,17 @@
 import React, { useState } from 'react';
 import {
   View,
+  Text,
+  TextInput,
+  TouchableOpacity,
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
-  ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '@stores/authStore';
-import { STUDENT, VARIANT, ROOM_LABEL } from '@constants/student';
-import { COLORS, SIZES } from '@constants/theme';
-import Typography from '@components/ui/Typography';
-import ShopInput from '@components/ui/ShopInput';
-import ShopButton from '@components/ShopButton';
+import { STUDENT } from '@constants/student';
 import Watermark from '@components/Watermark';
 
 export const LoginScreen = () => {
@@ -21,103 +20,73 @@ export const LoginScreen = () => {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const isPhoneField = VARIANT.authField === 'phone';
-  const fieldLabel = isPhoneField ? 'Số điện thoại sinh viên' : 'Email sinh viên';
-  const fieldPlaceholder = isPhoneField ? 'Nhập 10 số điện thoại (vd: 0987654321)' : 'Nhập email sinh viên (vd: sv@student.iuh.edu.vn)';
+  // Số cuối 1 -> Ô Login: phone
+  const placeholderText = `Số điện thoại — ${STUDENT.mssv}`;
 
   const handleLogin = () => {
     setError('');
-    const trimmed = authInput.trim();
-
-    if (!trimmed) {
-      setError(`Vui lòng nhập ${fieldLabel.toLowerCase()}`);
-      return;
-    }
-
-    if (isPhoneField) {
-      const phoneRegex = /^[0-9]{10}$/;
-      if (!phoneRegex.test(trimmed)) {
-        setError('Số điện thoại phải gồm đúng 10 chữ số hợp lệ');
-        return;
-      }
-    } else {
-      if (!trimmed.includes('@')) {
-        setError('Email không đúng định dạng');
-        return;
-      }
-    }
+    const trimmed = authInput.trim() || STUDENT.mssv;
 
     setIsLoading(true);
     setTimeout(() => {
       setIsLoading(false);
       login(trimmed);
-    }, 600);
+    }, 400);
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right', 'bottom']}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
       >
-        <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-          {VARIANT.watermarkAtTop && <Watermark />}
-
+        <View style={styles.container}>
+          {/* Brand Header */}
           <View style={styles.headerBox}>
-            <View style={styles.iconCircle}>
-              <Typography variant="h1">🛵</Typography>
-            </View>
-            <Typography variant="h1" color={COLORS.primary} style={styles.title}>
-              KTXGo
-            </Typography>
-            <Typography variant="body1" color={COLORS.textLight} style={styles.subtitle}>
-              Dịch vụ giao đồ tận phòng Ký túc xá
-            </Typography>
-            <View style={styles.roomBadge}>
-              <Typography variant="small" color="#B45309" style={{ fontWeight: '700' }}>
-                Khu nội trú · {ROOM_LABEL}
-              </Typography>
-            </View>
+            <Text style={styles.brandTitle}>KTXGO</Text>
+            <Text style={styles.brandSubtitle}>Giao đồ tận phòng ký túc xá</Text>
           </View>
 
-          <View style={styles.formCard}>
-            <Typography variant="h2" color={COLORS.text} style={styles.formTitle}>
-              Đăng nhập ứng dụng
-            </Typography>
-
-            <ShopInput
-              label={fieldLabel}
-              placeholder={fieldPlaceholder}
+          {/* Input Box with (A) Badge */}
+          <View style={styles.inputContainer}>
+            <TextInput
+              style={styles.input}
+              placeholder={placeholderText}
+              placeholderTextColor="#94A3B8"
               value={authInput}
-              onChangeText={(text) => {
-                setAuthInput(text);
+              onChangeText={(t) => {
+                setAuthInput(t);
                 if (error) setError('');
               }}
-              error={error}
-              keyboardType={isPhoneField ? 'phone-pad' : 'email-address'}
+              keyboardType="phone-pad"
               autoCapitalize="none"
             />
-
-            <ShopButton
-              title="Vào cửa hàng ➔"
-              onPress={handleLogin}
-              isLoading={isLoading}
-              style={styles.loginButton}
-            />
-
-            <View style={styles.infoBox}>
-              <Typography variant="small" color={COLORS.textLight} style={{ fontWeight: '600' }}>
-                Thí sinh: {STUDENT.hoTen} ({STUDENT.mssv})
-              </Typography>
-              <Typography variant="small" color={COLORS.primary} style={{ fontWeight: '700', marginTop: 2 }}>
-                Biến thể đăng nhập: {VARIANT.authField.toUpperCase()}
-              </Typography>
-            </View>
+            <Text style={styles.badgeA}>(A)</Text>
           </View>
 
-          {!VARIANT.watermarkAtTop && <Watermark />}
-        </ScrollView>
+          {!!error && <Text style={styles.errorText}>{error}</Text>}
+
+          {/* Action Button */}
+          <TouchableOpacity
+            style={styles.loginBtn}
+            onPress={handleLogin}
+            activeOpacity={0.85}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text style={styles.loginBtnText}>Vào cửa hàng</Text>
+            )}
+          </TouchableOpacity>
+
+          {/* Footer Subtitle */}
+          <Text style={styles.footerText}>Auth Stack · chưa có token</Text>
+        </View>
       </KeyboardAvoidingView>
+
+      {/* Watermark DƯỚI cho thí sinh số cuối 1 */}
+      <Watermark />
     </SafeAreaView>
   );
 };
@@ -125,73 +94,91 @@ export const LoginScreen = () => {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: '#EFF6FF',
   },
   keyboardView: {
     flex: 1,
   },
   container: {
-    flexGrow: 1,
+    flex: 1,
     justifyContent: 'center',
-    padding: SIZES.padding,
+    paddingHorizontal: 24,
+    paddingBottom: 40,
   },
   headerBox: {
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 40,
   },
-  iconCircle: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
-    backgroundColor: '#DBEAFE',
+  brandTitle: {
+    fontSize: 34,
+    fontWeight: '900',
+    color: '#1D4ED8',
+    letterSpacing: 0.5,
+  },
+  brandSubtitle: {
+    fontSize: 14,
+    color: '#64748B',
+    marginTop: 6,
+  },
+  inputContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: '#BFDBFE',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: 52,
+    shadowColor: '#1D4ED8',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  input: {
+    flex: 1,
+    fontSize: 14,
+    color: '#1E3A8A',
+    fontWeight: '500',
+    paddingVertical: 0,
+  },
+  badgeA: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1D4ED8',
+    marginLeft: 8,
+  },
+  errorText: {
+    color: '#DC2626',
+    fontSize: 12,
+    marginTop: 6,
+    marginLeft: 4,
+  },
+  loginBtn: {
+    backgroundColor: '#1D4ED8',
+    borderRadius: 14,
+    paddingVertical: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 10,
-    borderWidth: 2,
-    borderColor: COLORS.primary,
-  },
-  title: {
-    fontWeight: '900',
-    letterSpacing: 1,
-  },
-  subtitle: {
-    marginTop: 4,
-    textAlign: 'center',
-  },
-  roomBadge: {
-    backgroundColor: '#FEF3C7',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 16,
-    marginTop: 8,
-    borderWidth: 1,
-    borderColor: '#FDE68A',
-  },
-  formCard: {
-    backgroundColor: COLORS.surface,
-    padding: 20,
-    borderRadius: SIZES.radiusLg,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    shadowColor: COLORS.cardShadow,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
-    marginBottom: 16,
-  },
-  formTitle: {
-    marginBottom: 16,
-  },
-  loginButton: {
-    marginTop: 10,
-  },
-  infoBox: {
     marginTop: 16,
-    paddingTop: 14,
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
-    alignItems: 'center',
+    shadowColor: '#1D4ED8',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  loginBtnText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  footerText: {
+    color: '#64748B',
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 24,
   },
 });
 

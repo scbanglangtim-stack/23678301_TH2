@@ -1,12 +1,11 @@
 import React from 'react';
-import { Text, StyleSheet } from 'react-native';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { createBottomTabNavigator, BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import ShopStack from './ShopStack';
 import CartScreen from '@screens/CartScreen';
 import MeScreen from '@screens/MeScreen';
 import { useCartStore } from '@stores/cartStore';
 import { VARIANT } from '@constants/student';
-import { COLORS } from '@constants/theme';
 
 export type MainTabsParamList = {
   Shop: undefined;
@@ -16,90 +15,95 @@ export type MainTabsParamList = {
 
 const Tab = createBottomTabNavigator<MainTabsParamList>();
 
-// Emoji Icons for Tabs without relying on heavy external vector font packages
-const TabIcon = ({ name, focused }: { name: 'shop' | 'cart' | 'me'; focused: boolean }) => {
-  let emoji = '🏪';
-  if (name === 'cart') emoji = '🛒';
-  if (name === 'me') emoji = '👤';
+const CustomTabBar = ({ state, descriptors, navigation }: BottomTabBarProps) => {
+  const totalQuantity = useCartStore((s) => s.totalQuantity());
 
   return (
-    <Text style={[styles.iconText, { opacity: focused ? 1 : 0.6 }]}>
-      {emoji}
-    </Text>
+    <View style={styles.tabBar}>
+      {state.routes.map((route, index) => {
+        const { options } = descriptors[route.key];
+        const isFocused = state.index === index;
+
+        const onPress = () => {
+          const event = navigation.emit({
+            type: 'tabPress',
+            target: route.key,
+            canPreventDefault: true,
+          });
+
+          if (!isFocused && !event.defaultPrevented) {
+            navigation.navigate(route.name);
+          }
+        };
+
+        let label = 'Cửa hàng';
+        if (route.name === 'Cart') label = 'Giỏ';
+        if (route.name === 'Me') label = 'Tôi';
+
+        return (
+          <TouchableOpacity
+            key={route.key}
+            onPress={onPress}
+            activeOpacity={0.8}
+            style={styles.tabItem}
+            accessibilityRole="button"
+            accessibilityState={isFocused ? { selected: true } : {}}
+            accessibilityLabel={label}
+          >
+            <View style={styles.labelContainer}>
+              <Text style={[styles.tabText, isFocused && styles.tabTextActive]}>
+                {label}
+              </Text>
+              {route.name === 'Cart' && totalQuantity > 0 && (
+                <View style={styles.badgeCircle}>
+                  <Text style={styles.badgeText}>{totalQuantity}</Text>
+                </View>
+              )}
+            </View>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
   );
 };
 
 export const MainTabs = () => {
-  const totalQuantity = useCartStore((state) => state.totalQuantity());
-
-  const shopTabScreen = (
+  const shopTab = (
     <Tab.Screen
       key="shop"
       name="Shop"
       component={ShopStack}
-      options={{
-        title: 'Cửa hàng',
-        tabBarIcon: ({ focused }) => <TabIcon name="shop" focused={focused} />,
-      }}
+      options={{ title: 'Cửa hàng' }}
     />
   );
 
-  const cartTabScreen = (
+  const cartTab = (
     <Tab.Screen
       key="cart"
       name="Cart"
       component={CartScreen}
-      options={{
-        title: 'Giỏ hàng',
-        tabBarBadge: totalQuantity > 0 ? totalQuantity : undefined,
-        tabBarBadgeStyle: {
-          backgroundColor: COLORS.secondary,
-          color: COLORS.white,
-          fontSize: 10,
-          fontWeight: 'bold',
-        },
-        tabBarIcon: ({ focused }) => <TabIcon name="cart" focused={focused} />,
-      }}
+      options={{ title: 'Giỏ' }}
     />
   );
 
-  const meTabScreen = (
+  const meTab = (
     <Tab.Screen
       key="me"
       name="Me"
       component={MeScreen}
-      options={{
-        title: 'Tôi',
-        tabBarIcon: ({ focused }) => <TabIcon name="me" focused={focused} />,
-      }}
+      options={{ title: 'Tôi' }}
     />
   );
 
-  // Thứ tự Tab theo VARIANT.tabOrder ('shopFirst' hoặc 'cartFirst')
   const screens =
     VARIANT.tabOrder === 'cartFirst'
-      ? [cartTabScreen, shopTabScreen, meTabScreen]
-      : [shopTabScreen, cartTabScreen, meTabScreen];
+      ? [cartTab, shopTab, meTab]
+      : [shopTab, cartTab, meTab];
 
   return (
     <Tab.Navigator
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: COLORS.primary,
-        tabBarInactiveTintColor: COLORS.textLight,
-        tabBarStyle: {
-          backgroundColor: COLORS.surface,
-          borderTopColor: COLORS.border,
-          borderTopWidth: 1,
-          height: 60,
-          paddingBottom: 8,
-          paddingTop: 6,
-        },
-        tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: '600',
-        },
-      }}
+      tabBar={(props) => <CustomTabBar {...props} />}
+      screenOptions={{ headerShown: false }}
     >
       {screens}
     </Tab.Navigator>
@@ -107,8 +111,54 @@ export const MainTabs = () => {
 };
 
 const styles = StyleSheet.create({
-  iconText: {
-    fontSize: 20,
+  tabBar: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#BFDBFE',
+    height: 52,
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    elevation: 4,
+    shadowColor: '#1E293B',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 3,
+  },
+  tabItem: {
+    flex: 1,
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  labelContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tabText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#64748B',
+  },
+  tabTextActive: {
+    color: '#1D4ED8',
+    fontWeight: '800',
+  },
+  badgeCircle: {
+    backgroundColor: '#EA580C',
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 6,
+  },
+  badgeText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '800',
+    lineHeight: 13,
   },
 });
 

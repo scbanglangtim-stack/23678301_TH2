@@ -1,25 +1,27 @@
-import React, { memo } from 'react';
-import { View, Image, StyleSheet, TouchableOpacity, Dimensions, Vibration } from 'react-native';
+import React, { memo, useState } from 'react';
+import { View, StyleSheet, TouchableOpacity, Vibration, Text, Image, ActivityIndicator } from 'react-native';
 import { Product } from '@services/productApi';
 import { PRICE_MULTIPLIER, VARIANT } from '@constants/student';
-import { COLORS, SIZES } from '@constants/theme';
 import { useCartStore } from '@stores/cartStore';
-import Typography from '@components/ui/Typography';
 
-const { width } = Dimensions.get('window');
-const CARD_WIDTH = (width - SIZES.padding * 2 - SIZES.paddingSm) / 2;
+const PASTEL_COLORS = ['#FEF3C7', '#DBEAFE', '#DCFCE7', '#FCE7F3', '#EDE9FE', '#FFEDD5'];
 
 interface Props {
   product: Product;
+  index?: number;
   onPress: () => void;
 }
 
-export const ProductCard = ({ product, onPress }: Props) => {
+export const ProductCard = ({ product, index = 0, onPress }: Props) => {
   const addItem = useCartStore((state) => state.addItem);
+  const [imageLoading, setImageLoading] = useState(true);
+  const [imageError, setImageError] = useState(false);
+
   const formattedPrice = Math.round(product.price * PRICE_MULTIPLIER).toLocaleString('vi-VN') + ' đ';
+  const bgColor = PASTEL_COLORS[index % PASTEL_COLORS.length];
 
   const handleAddToCart = () => {
-    // Kích hoạt haptic feedback theo đúng VARIANT.hapticOnAdd ('selection' cho số cuối 1)
+    // Haptic selection (20ms) cho thí sinh số cuối 1
     if (VARIANT.hapticOnAdd === 'impact') {
       Vibration.vibrate(40);
     } else {
@@ -35,27 +37,42 @@ export const ProductCard = ({ product, onPress }: Props) => {
   };
 
   return (
-    <TouchableOpacity activeOpacity={0.85} style={styles.card} onPress={onPress}>
-      <View style={styles.imageContainer}>
-        <Image source={{ uri: product.image }} style={styles.image} resizeMode="contain" />
-        <View style={styles.categoryBadge}>
-          <Typography variant="small" color={COLORS.primary} style={styles.categoryText} numberOfLines={1}>
-            {product.category}
-          </Typography>
-        </View>
+    <TouchableOpacity activeOpacity={0.88} style={styles.card} onPress={onPress}>
+      {/* Image Container with pastel background and clean food thumbnail */}
+      <View style={[styles.imageContainer, { backgroundColor: bgColor }]}>
+        {!imageError && product.image ? (
+          <>
+            <Image
+              source={{ uri: product.image }}
+              style={styles.productImage}
+              resizeMode="cover"
+              onLoadEnd={() => setImageLoading(false)}
+              onError={() => {
+                setImageLoading(false);
+                setImageError(true);
+              }}
+            />
+            {imageLoading && (
+              <View style={styles.loadingOverlay}>
+                <ActivityIndicator size="small" color="#1D4ED8" />
+              </View>
+            )}
+          </>
+        ) : (
+          <View style={styles.fallbackBlock}>
+            <Text style={styles.fallbackEmoji}>🍲</Text>
+          </View>
+        )}
       </View>
 
       <View style={styles.content}>
-        <Typography variant="body2" color={COLORS.text} style={styles.title} numberOfLines={2}>
+        <Text style={styles.title} numberOfLines={1}>
           {product.title}
-        </Typography>
+        </Text>
 
         <View style={styles.priceRow}>
-          <View style={{ flex: 1 }}>
-            <Typography variant="body1" color={COLORS.primary} style={styles.price}>
-              {formattedPrice}
-            </Typography>
-          </View>
+          <Text style={styles.price}>{formattedPrice}</Text>
+
           <TouchableOpacity
             style={styles.addButton}
             onPress={handleAddToCart}
@@ -63,9 +80,7 @@ export const ProductCard = ({ product, onPress }: Props) => {
             accessibilityLabel={`Thêm ${product.title} vào giỏ`}
             accessibilityRole="button"
           >
-            <Typography variant="h3" color={COLORS.white} style={styles.addIcon}>
-              +
-            </Typography>
+            <Text style={styles.addIcon}>+</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -75,78 +90,81 @@ export const ProductCard = ({ product, onPress }: Props) => {
 
 const styles = StyleSheet.create({
   card: {
-    width: CARD_WIDTH,
-    backgroundColor: COLORS.surface,
-    borderRadius: SIZES.radius,
-    marginBottom: SIZES.paddingSm,
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    margin: 6,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: '#BFDBFE',
     overflow: 'hidden',
-    shadowColor: COLORS.cardShadow,
-    shadowOffset: { width: 0, height: 2 },
+    padding: 8,
+    shadowColor: '#1E293B',
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowRadius: 3,
+    elevation: 1.5,
   },
   imageContainer: {
     width: '100%',
-    height: 120,
-    backgroundColor: '#FFFFFF',
-    padding: 8,
+    height: 100,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
     position: 'relative',
+    overflow: 'hidden',
+  },
+  productImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 10,
+  },
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.4)',
+  },
+  fallbackBlock: {
     alignItems: 'center',
     justifyContent: 'center',
   },
-  image: {
-    width: '100%',
-    height: '100%',
-  },
-  categoryBadge: {
-    position: 'absolute',
-    top: 6,
-    left: 6,
-    backgroundColor: '#DBEAFE',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  categoryText: {
-    fontSize: 9,
-    fontWeight: '800',
-    textTransform: 'uppercase',
+  fallbackEmoji: {
+    fontSize: 34,
   },
   content: {
-    padding: 10,
-    backgroundColor: COLORS.surface,
-    flex: 1,
-    justifyContent: 'space-between',
+    marginTop: 6,
+    paddingHorizontal: 2,
   },
   title: {
+    fontSize: 13,
     fontWeight: '700',
-    lineHeight: 16,
-    height: 32,
-    marginBottom: 6,
+    color: '#1E3A8A',
+    marginBottom: 2,
   },
   priceRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 4,
+    marginTop: 2,
   },
   price: {
-    fontWeight: '900',
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#1D4ED8',
   },
   addButton: {
-    backgroundColor: COLORS.primary,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    backgroundColor: '#1D4ED8',
+    width: 26,
+    height: 26,
+    borderRadius: 7,
     alignItems: 'center',
     justifyContent: 'center',
   },
   addIcon: {
-    lineHeight: 20,
+    color: '#FFFFFF',
+    fontSize: 15,
     fontWeight: '800',
+    lineHeight: 16,
   },
 });
 

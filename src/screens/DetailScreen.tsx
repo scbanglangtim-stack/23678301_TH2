@@ -1,12 +1,14 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
-  Image,
   StyleSheet,
   ScrollView,
   ActivityIndicator,
   Alert,
   Vibration,
+  TouchableOpacity,
+  Text,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { RouteProp, useRoute, useNavigation } from '@react-navigation/native';
@@ -14,9 +16,6 @@ import { useQuery } from '@tanstack/react-query';
 import { fetchProductById, Product } from '@services/productApi';
 import { useCartStore } from '@stores/cartStore';
 import { STUDENT, PRICE_MULTIPLIER, VARIANT, ROOM_LABEL } from '@constants/student';
-import { COLORS, SIZES } from '@constants/theme';
-import Typography from '@components/ui/Typography';
-import ShopButton from '@components/ShopButton';
 import Watermark from '@components/Watermark';
 import { ShopStackParamList } from '@navigation/ShopStack';
 
@@ -28,12 +27,13 @@ export const DetailScreen = () => {
   const { id } = route.params;
 
   const addItem = useCartStore((state) => state.addItem);
+  const [imgLoading, setImgLoading] = useState(true);
+  const [imgError, setImgError] = useState(false);
 
   const {
     data: product,
     isLoading,
     isError,
-    error,
     refetch,
   } = useQuery<Product>({
     queryKey: ['product', id],
@@ -43,7 +43,7 @@ export const DetailScreen = () => {
   const handleAddToCart = () => {
     if (!product) return;
 
-    // Haptic feedback theo VARIANT
+    // Haptic selection cho số cuối 1
     if (VARIANT.hapticOnAdd === 'impact') {
       Vibration.vibrate(40);
     } else {
@@ -61,122 +61,97 @@ export const DetailScreen = () => {
 
     Alert.alert(
       `KTXGo · ${STUDENT.mssv}`,
-      `Đã thêm "${product.title}" vào giỏ hàng thành công!\nPhòng nhận: ${ROOM_LABEL}`,
-      [
-        { text: 'Tiếp tục mua' },
-        {
-          text: 'Xem giỏ hàng',
-          onPress: () => (navigation as any).navigate('Cart'),
-        },
-      ]
+      `Đã thêm "${product.title}" vào giỏ hàng thành công!\nPhòng nhận: ${ROOM_LABEL}`
     );
   };
 
-  if (isLoading) {
-    return (
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.centerBox}>
-          <ActivityIndicator size="large" color={COLORS.primary} />
-          <Typography variant="body1" color={COLORS.textLight} style={{ marginTop: 12 }}>
-            Đang tải chi tiết món #{id} ({STUDENT.mssv})...
-          </Typography>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  if (isError || !product) {
-    return (
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.centerBox}>
-          <Typography variant="h1" style={{ marginBottom: 8 }}>⚠️</Typography>
-          <Typography variant="h2" color={COLORS.error} style={{ fontWeight: '800' }}>
-            Không thể tải chi tiết món!
-          </Typography>
-          <Typography variant="body2" color={COLORS.textLight} style={{ marginTop: 4, textAlign: 'center' }}>
-            {(error as any)?.message || 'Vui lòng kiểm tra lại kết nối mạng'}
-          </Typography>
-          <ShopButton title="Thử lại" onPress={() => refetch()} style={{ marginTop: 16, height: 40 }} />
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  const formattedPrice = Math.round(product.price * PRICE_MULTIPLIER).toLocaleString('vi-VN') + ' đ';
+  const formattedPrice = product
+    ? Math.round(product.price * PRICE_MULTIPLIER).toLocaleString('vi-VN') + ' đ'
+    : '28.500 đ';
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['bottom', 'left', 'right']}>
-      {VARIANT.watermarkAtTop && <Watermark />}
+    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right', 'bottom']}>
+      {/* Header with Back button and Stack badge */}
+      <View style={styles.navHeader}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Text style={styles.backText}>← Chi tiết món</Text>
+        </TouchableOpacity>
+        <Text style={styles.stackBadge}>Stack</Text>
+      </View>
 
-      <ScrollView contentContainerStyle={styles.container}>
-        <View style={styles.imageCard}>
-          <Image source={{ uri: product.image }} style={styles.image} resizeMode="contain" />
-          <View style={styles.badgeCategory}>
-            <Typography variant="small" color={COLORS.primary} style={styles.badgeCategoryText}>
-              {product.category}
-            </Typography>
-          </View>
+      {isLoading ? (
+        <View style={styles.centerBox}>
+          <ActivityIndicator size="large" color="#1D4ED8" />
+          <Text style={styles.loadingText}>Đang tải chi tiết món...</Text>
         </View>
+      ) : isError || !product ? (
+        <View style={styles.centerBox}>
+          <Text style={styles.errorMssv}>{STUDENT.mssv}</Text>
+          <Text style={styles.errorMessage}>Không thể tải chi tiết món #{id}</Text>
+          <TouchableOpacity style={styles.retryBtn} onPress={() => refetch()}>
+            <Text style={styles.retryText}>Thử lại</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <ScrollView contentContainerStyle={styles.container} bounces={false}>
+          {/* Food Image Banner */}
+          <View style={styles.imageCard}>
+            {!imgError && product.image ? (
+              <>
+                <Image
+                  source={{ uri: product.image }}
+                  style={styles.detailImage}
+                  resizeMode="cover"
+                  onLoadEnd={() => setImgLoading(false)}
+                  onError={() => {
+                    setImgLoading(false);
+                    setImgError(true);
+                  }}
+                />
+                {imgLoading && (
+                  <View style={styles.loadingOverlay}>
+                    <ActivityIndicator size="small" color="#1D4ED8" />
+                  </View>
+                )}
+              </>
+            ) : (
+              <View style={styles.fallbackBox}>
+                <Text style={styles.fallbackEmoji}>🍲</Text>
+              </View>
+            )}
+          </View>
 
-        <View style={styles.detailsCard}>
-          <Typography variant="h2" color={COLORS.text} style={styles.title}>
-            {product.title}
-          </Typography>
+          {/* Centered Product Info */}
+          <View style={styles.infoSection}>
+            <Text style={styles.title}>{product.title}</Text>
+            <Text style={styles.price}>{formattedPrice}</Text>
+            <Text style={styles.subtitle}>Giao nội khu · nhận tận {ROOM_LABEL}</Text>
 
-          <View style={styles.ratingRow}>
-            <Typography variant="body2" style={{ marginRight: 4 }}>⭐⭐⭐⭐⭐</Typography>
-            <Typography variant="small" color={COLORS.textLight} style={{ fontWeight: '600' }}>
-              {product.rating?.rate || 4.5} ({product.rating?.count || 120} đánh giá)
-            </Typography>
-            <View style={styles.deliveryBadge}>
-              <Typography variant="small" color={COLORS.secondary} style={{ fontWeight: '700' }}>
-                ⚡ Giao tận {ROOM_LABEL}
-              </Typography>
+            <View style={styles.descBox}>
+              <Text style={styles.descText} numberOfLines={3}>
+                {product.description || 'Mô tả ngắn từ API (tối đa 3 dòng).'}
+              </Text>
+              <Text style={styles.idNote}>Mã món #{product.id} · Giữ nguyên id từ route.params</Text>
             </View>
           </View>
 
-          <View style={styles.priceContainer}>
-            <Typography variant="body1" color={COLORS.textLight} style={{ marginRight: 8 }}>
-              Đơn giá:
-            </Typography>
-            <Typography variant="h1" color={COLORS.primary} style={styles.priceValue}>
-              {formattedPrice}
-            </Typography>
-          </View>
+          {/* Action Button: Thêm vào giỏ · Haptic */}
+          <TouchableOpacity
+            style={styles.addCartBtn}
+            onPress={handleAddToCart}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.addCartBtnText}>Thêm vào giỏ · Haptic</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      )}
 
-          <View style={styles.divider} />
-
-          <Typography variant="h3" color={COLORS.text} style={styles.sectionHeading}>
-            Mô tả chi tiết
-          </Typography>
-          <Typography variant="body1" color="#334155" style={styles.description}>
-            {product.description}
-          </Typography>
-
-          <View style={styles.metaBox}>
-            <Typography variant="body2" color={COLORS.text}>• Mã sản phẩm: KTX-{STUDENT.mssv}-{product.id}</Typography>
-            <Typography variant="body2" color={COLORS.text} style={{ marginTop: 2 }}>• Thời gian giao dự kiến: 10 - 20 phút</Typography>
-            <Typography variant="body2" color={COLORS.text} style={{ marginTop: 2 }}>• Phục vụ nội khu: KTX Trường ĐH Công nghiệp TP.HCM</Typography>
-          </View>
-        </View>
-      </ScrollView>
-
-      {/* Bottom Action Bar */}
-      <View style={styles.bottomBar}>
-        <View style={styles.priceSummary}>
-          <Typography variant="small" color={COLORS.textLight}>Thành tiền</Typography>
-          <Typography variant="h2" color={COLORS.primary} style={{ fontWeight: '900' }}>
-            {formattedPrice}
-          </Typography>
-        </View>
-        <ShopButton
-          title="🛒 Thêm vào giỏ"
-          onPress={handleAddToCart}
-          style={{ width: 160 }}
-        />
-      </View>
-
-      {!VARIANT.watermarkAtTop && <Watermark />}
+      {/* Watermark DƯỚI cho thí sinh số cuối 1 */}
+      <Watermark />
     </SafeAreaView>
   );
 };
@@ -184,7 +159,122 @@ export const DetailScreen = () => {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: '#EFF6FF',
+  },
+  navHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#EFF6FF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#BFDBFE',
+  },
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  backText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1D4ED8',
+  },
+  stackBadge: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#EA580C',
+  },
+  container: {
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    flexGrow: 1,
+  },
+  imageCard: {
+    width: '100%',
+    height: 180,
+    backgroundColor: '#FEF3C7',
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  detailImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 16,
+  },
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.4)',
+  },
+  fallbackBox: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fallbackEmoji: {
+    fontSize: 54,
+  },
+  infoSection: {
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#1E3A8A',
+    textAlign: 'center',
+  },
+  price: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#1D4ED8',
+    marginTop: 4,
+  },
+  subtitle: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 4,
+  },
+  descBox: {
+    width: '100%',
+    marginTop: 14,
+    paddingHorizontal: 10,
+  },
+  descText: {
+    fontSize: 13,
+    color: '#64748B',
+    lineHeight: 18,
+    textAlign: 'center',
+  },
+  idNote: {
+    fontSize: 12,
+    color: '#94A3B8',
+    marginTop: 6,
+    textAlign: 'center',
+  },
+  addCartBtn: {
+    backgroundColor: '#1D4ED8',
+    borderRadius: 14,
+    paddingVertical: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 20,
+    marginBottom: 10,
+    shadowColor: '#1D4ED8',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  addCartBtnText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
   },
   centerBox: {
     flex: 1,
@@ -192,103 +282,35 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 24,
   },
-  container: {
-    padding: SIZES.padding,
-    paddingBottom: 24,
-  },
-  imageCard: {
-    backgroundColor: COLORS.surface,
-    borderRadius: SIZES.radiusLg,
-    padding: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    position: 'relative',
-    height: 260,
-  },
-  image: {
-    width: '100%',
-    height: '100%',
-  },
-  badgeCategory: {
-    position: 'absolute',
-    top: 12,
-    left: 12,
-    backgroundColor: '#DBEAFE',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  badgeCategoryText: {
-    fontWeight: '800',
-    textTransform: 'uppercase',
-  },
-  detailsCard: {
-    backgroundColor: COLORS.surface,
-    borderRadius: SIZES.radiusLg,
-    padding: 16,
+  loadingText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1E3A8A',
     marginTop: 12,
-    borderWidth: 1,
-    borderColor: COLORS.border,
   },
-  title: {
-    fontWeight: '800',
-    lineHeight: 24,
-  },
-  ratingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    marginTop: 8,
-  },
-  deliveryBadge: {
-    marginLeft: 10,
-    backgroundColor: '#FFF7ED',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  priceContainer: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    marginTop: 14,
-  },
-  priceValue: {
+  errorMssv: {
+    fontSize: 18,
     fontWeight: '900',
+    color: '#DC2626',
+    marginBottom: 4,
   },
-  divider: {
-    height: 1,
-    backgroundColor: '#E2E8F0',
-    marginVertical: 14,
-  },
-  sectionHeading: {
+  errorMessage: {
+    fontSize: 14,
     fontWeight: '700',
-    marginBottom: 6,
+    color: '#1E3A8A',
+    textAlign: 'center',
+    marginBottom: 16,
   },
-  description: {
-    lineHeight: 20,
+  retryBtn: {
+    backgroundColor: '#DC2626',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 36,
   },
-  metaBox: {
-    backgroundColor: COLORS.background,
-    padding: 12,
-    borderRadius: SIZES.radiusSm,
-    marginTop: 14,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  bottomBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: SIZES.padding,
-    paddingVertical: 12,
-    backgroundColor: COLORS.surface,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-  },
-  priceSummary: {
-    flex: 1,
+  retryText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
   },
 });
 

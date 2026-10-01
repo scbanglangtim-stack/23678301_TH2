@@ -18,11 +18,13 @@ android/app/build/
 android/build/
 .gradle/
 android/.gradle/
+android/app/.cxx/
 local.properties
 android/local.properties
 
 # Temporary
 *.tmp
 *.log
+~$*
 THUC-HANH-2_extracted.md
 extracted_doc_content.txt

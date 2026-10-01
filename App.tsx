@@ -19,13 +19,13 @@ const queryClient = new QueryClient({
 function App(): React.JSX.Element {
   return (
     <SafeAreaProvider>
-      <ThemeProvider>
-        <QueryClientProvider client={queryClient}>
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider>
           <NavigationContainer>
             <RootNavigator />
           </NavigationContainer>
-        </QueryClientProvider>
-      </ThemeProvider>
+        </ThemeProvider>
+      </QueryClientProvider>
     </SafeAreaProvider>
   );
 }
